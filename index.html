@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Order Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0f0f13;
+    --surface:   #1a1a22;
+    --surface2:  #22222e;
+    --border:    #2e2e3e;
+    --accent:    #00e5a0;
+    --accent2:   #f0c040;
+    --danger:    #ff5f6d;
+    --text:      #e8e8f0;
+    --muted:     #6b6b80;
+    --freezer:   #4a9ebb;
+    --walkin:    #4ebb7a;
+    --office:    #d4845a;
+    --attic:     #9b6bbf;
+    --cooler:    #d4a24a;
+    --baking:    #e07070;
+    --radius:    12px;
+    --tap:       52px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding-bottom: 120px;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px 10px;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+
+  .date-badge {
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--surface);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .search-wrap { position: relative; }
+  .search-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px 10px 36px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 10px 16px 0;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .tab.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+
+  main { padding: 12px 16px 0; }
+
+  .section { margin-bottom: 8px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .section-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: .12;
+    background: currentColor;
+  }
+
+  .section-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .section-label { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; flex: 1; }
+  .section-count { font-size: 11px; opacity: .7; background: rgba(0,0,0,.25); padding: 2px 8px; border-radius: 10px; }
+  .section-chevron { font-size: 12px; transition: transform .2s; }
+  .section.collapsed .section-chevron { transform: rotate(-90deg); }
+
+  .section-body {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: hidden;
+  }
+  .section.collapsed .section-body { display: none; }
+
+  /* Column header row */
+  .col-header {
+    display: grid;
+    grid-template-columns: 52px 1fr 90px 72px 36px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 5px 0;
+  }
+  .col-header span {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+  }
+  .col-header span:nth-child(2) { text-align: left; padding-left: 2px; }
+
+  /* Item row — 5 columns: checkbox | name | qty | par | note */
+  .item {
+    display: grid;
+    grid-template-columns: 52px 1fr 90px 72px 36px;
+    align-items: center;
+    min-height: var(--tap);
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .item:last-child { border-bottom: none; }
+  .item.checked { background: rgba(0,229,160,.04); }
+  .item.hidden { display: none; }
+
+  .item-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    cursor: pointer;
+  }
+  .check-box {
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    font-size: 14px;
+    color: transparent;
+  }
+  .item.checked .check-box {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  .item-name {
+    font-size: 13px;
+    padding: 10px 6px 10px 2px;
+    line-height: 1.3;
+    cursor: pointer;
+  }
+  .item.checked .item-name { color: var(--accent); }
+
+  /* QTY counter */
+  .qty-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .qty-inner {
+    display: flex;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .qty-required .qty-inner { border-color: var(--accent2); }
+
+  .qty-btn {
+    width: 26px; height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 16px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: background .1s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .qty-btn:active { background: rgba(0,229,160,.15); }
+  .qty-val {
+    min-width: 22px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent2);
+  }
+
+  /* PAR cell — inline editable */
+  .par-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+  .par-input {
+    width: 48px;
+    height: 32px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    text-align: center;
+    outline: none;
+    transition: border-color .15s, color .15s;
+  }
+  .par-input:focus {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .par-input::placeholder { color: var(--border); }
+
+  /* Note button */
+  .note-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .note-btn {
+    width: 28px; height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: border-color .15s;
+  }
+  .note-btn.has-note { border-color: var(--accent2); }
+
+  /* Note row — spans full width below item */
+  .note-row {
+    display: none;
+    grid-column: 1 / -1;
+    padding: 0 12px 10px 54px;
+  }
+  .note-row.open { display: block; }
+  .note-row input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    outline: none;
+  }
+  .note-row input:focus { border-color: var(--accent2); }
+  .note-row input::placeholder { color: var(--muted); }
+
+  .legend {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .legend span { color: var(--accent2); }
+
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    z-index: 100;
+  }
+
+  .btn {
+    flex: 1;
+    height: 48px;
+    border-radius: var(--radius);
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:active { opacity: .8; transform: scale(.98); }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    flex: 0 0 auto;
+    width: 48px;
+  }
+  .checked-count { font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 400; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.8);
+    z-index: 200;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    margin: auto;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent); }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px; }
+
+  .modal-body { padding: 16px 20px; }
+  .modal-date { font-size: 11px; color: var(--muted); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+
+  .summary-section { margin-bottom: 16px; }
+  .summary-section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .summary-item-wrap { border-bottom: 1px solid var(--border); padding: 6px 0; }
+  .summary-item-wrap:last-child { border-bottom: none; }
+  .summary-item { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; gap: 12px; }
+  .summary-item-name { flex: 1; }
+  .summary-item-qty { color: var(--accent2); font-size: 12px; white-space: nowrap; }
+  .summary-item-note { font-size: 11px; color: var(--muted); font-style: italic; padding-left: 12px; margin-top: 2px; }
+
+  .modal-actions { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); }
+  .copy-btn {
+    flex: 1; height: 44px; border-radius: var(--radius);
+    background: var(--accent); color: #000; border: none;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .reset-btn {
+    height: 44px; padding: 0 20px; border-radius: var(--radius);
+    background: var(--surface2); color: var(--danger);
+    border: 1px solid var(--danger);
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .copy-confirm { text-align: center; font-size: 11px; color: var(--accent); height: 16px; margin-top: 6px; padding-bottom: 8px; }
+
+  .section.all-hidden { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <h1>🍽 ORDER SHEET</h1>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="searchInput" placeholder="Search items..." autocomplete="off" autocorrect="off" spellcheck="false">
+  </div>
+</header>
+
+<div class="tabs" id="tabBar"></div>
+
+<main id="mainContent">
+  <div class="legend">
+    <span>☑</span> Check item to flag it — QTY auto-sets to 1 &nbsp;|&nbsp;
+    <span>QTY</span> Use +/− to adjust cases needed &nbsp;|&nbsp;
+    <span>PAR</span> Tap to set/edit par level anytime &nbsp;|&nbsp;
+    <span>★</span> Yellow border = always enter quantity
+  </div>
+</main>
+
+<div class="bottom-bar">
+  <button class="btn btn-secondary" id="clearBtn" title="Clear all">↺</button>
+  <button class="btn btn-primary" id="summaryBtn">
+    VIEW ORDER &nbsp;<span class="checked-count" id="checkedCount"></span>
+  </button>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">📋 ORDER SUMMARY</span>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-date" id="modalDate"></div>
+      <div id="summaryContent"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="copy-btn" id="copyBtn">📋 COPY TO CLIPBOARD</button>
+      <button class="reset-btn" id="resetBtn">CLEAR ALL</button>
+    </div>
+    <div class="copy-confirm" id="copyConfirm"></div>
+  </div>
+</div>
+
+<script>
+const sections = [
+  { id: "freezer", label: "FREEZER", color: "var(--freezer)", items: [
+    { name: "Fries", qty: true }, { name: "Waffle Fries", qty: true },
+    { name: "O-Rings", qty: true }, { name: "Sweets", qty: true },
+    { name: "Deep Fried Pickles", qty: true }, { name: "Fingers", qty: true },
+    { name: "Haddock", qty: true }, { name: "Pollock", qty: true }, { name: "Shrimp", qty: true },
+  ]},
+  { id: "walkin", label: "WALK-IN", color: "var(--walkin)", items: [
+    { name: "Chicken Tenders" }, { name: "Chicken Breast" },
+    { name: "Wings", qty: true }, { name: "Bacon" }, { name: "Porkbelly" },
+    { name: "Pork Shoulder" }, { name: "Ribs" }, { name: "Turkey" },
+    { name: "Burgers", qty: true }, { name: "Ground Beef" },
+    { name: "Sirloins", qty: true }, { name: "Ham" },
+    { name: "Sour Cream" }, { name: "Eggs" }, { name: "Buttermilk" },
+    { name: "Half n Half" }, { name: "Butter" }, { name: "Butter Chips" },
+    { name: "Fresh Garlic" }, { name: "Chicken Paste" }, { name: "Beef Paste" },
+    { name: "Mozzarella" }, { name: "Cheddar" }, { name: "American" },
+    { name: "Bleu" }, { name: "Feta" }, { name: "Cream Cheese" },
+    { name: "Sliced Cheddar" }, { name: "Sliced American" },
+    { name: "Sliced Pepperjack" }, { name: "Sliced Provolone" }, { name: "Sliced Swiss" },
+    { name: "Lemons" }, { name: "Limes" }, { name: "Pickles" },
+    { name: "Cabbage" }, { name: "Cherry Tomatoes" }, { name: "Whole Tomatoes" },
+    { name: "Leaf Lettuce" }, { name: "Spinach" }, { name: "Mushrooms" },
+    { name: "Fresh Jalapeños" }, { name: "Romaine" }, { name: "Iceberg" },
+    { name: "Celery" }, { name: "Avocado" }, { name: "White Onion" }, { name: "Red Onion" },
+    { name: "Pretzels" }, { name: "Sub Rolls" }, { name: "Ciabatta" },
+    { name: "White Bread" }, { name: "Brioche" }, { name: "Small Tortillas" },
+    { name: "Large Tortillas" }, { name: "Naan" }, { name: "Belgian Waffles" },
+  ]},
+  { id: "office", label: "OFFICE / SHELF", color: "var(--office)", items: [
+    { name: "Red Potatoes" }, { name: "Idaho Potatoes" }, { name: "Pan Spray" },
+    { name: "Mayo" }, { name: "Dried Garlic" }, { name: "Oregano" },
+    { name: "Parsley" }, { name: "Basil" }, { name: "Pickle Seasoning" },
+    { name: "Poultry Seasoning" }, { name: "Orzo" }, { name: "Mac Noodles" },
+    { name: "Penne" }, { name: "Spaghetti" },
+  ]},
+  { id: "attic", label: "ATTIC", color: "var(--attic)", items: [
+    { name: "Soy Sauce" }, { name: "Maple Syrup" }, { name: "Honey" },
+    { name: "Worcestershire Sauce" }, { name: "Vinegar" }, { name: "Apple Cider Vinegar" },
+    { name: "BBQ Sauce" }, { name: "Hot Sauce" }, { name: "Sweet Chili" },
+    { name: "Butter Alternative" }, { name: "Olive Oil" }, { name: "Mango Hab" },
+    { name: "Honey Mustard" }, { name: "Canned Crushed Tomatoes" },
+    { name: "Canned Artichokes" }, { name: "Canned Clams" },
+    { name: "Canned Red Peppers" }, { name: "Olives" }, { name: "Relish" },
+    { name: "Banana Peppers" }, { name: "White Rice" }, { name: "Arborio" },
+    { name: "White Beans" }, { name: "Kidney Beans" }, { name: "Black Beans" },
+    { name: "Cajun Seasoning" }, { name: "Ranch Seasoning" }, { name: "Salt" },
+    { name: "Pepper" }, { name: "Cumin" }, { name: "Mild Chili Powder" },
+    { name: "Brown Sugar" }, { name: "Flour" }, { name: "Drake's" },
+    { name: "Cornstarch" }, { name: "Sugar" }, { name: "Tortilla Chips" },
+    { name: "Crispy Onions" }, { name: "Bread Crumbs" },
+  ]},
+  { id: "cooler", label: "KITCHEN COOLER", color: "var(--cooler)", items: [
+    { name: "Shredded Carrots" }, { name: "Cucumbers" },
+    { name: "Caesar Dressing" }, { name: "Thousand Island" }, { name: "Poppyseed" },
+    { name: "Balsamic" }, { name: "Riviera" }, { name: "Catalina" },
+    { name: "Ketchup" }, { name: "Mustard" },
+  ]},
+  { id: "baking", label: "BAKING", color: "var(--baking)", items: [
+    { name: "Vanilla Extract" }, { name: "Pecans" }, { name: "Nutmeg" },
+    { name: "Ginger" }, { name: "Cinnamon" }, { name: "Heavy Cream" },
+    { name: "Caramel Topping" }, { name: "Chocolate Topping" },
+    { name: "Whipped Canister Refills", qty: true },
+  ]},
+];
+
+// State: checked, qty, note per item. PAR stored separately (persistent via localStorage key)
+const state = {};
+const parData = {};
+
+function getKey(sId, iIdx) { return `${sId}:${iIdx}`; }
+function getState(sId, iIdx) { return state[getKey(sId, iIdx)] || { checked: false, qty: 0, note: "" }; }
+function setState(sId, iIdx, patch) { state[getKey(sId, iIdx)] = { ...getState(sId, iIdx), ...patch }; }
+function getPar(sId, iIdx) { return parData[getKey(sId, iIdx)] || ""; }
+function setPar(sId, iIdx, val) { parData[getKey(sId, iIdx)] = val; }
+
+function fmtDate() {
+  return new Date().toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
+}
+document.getElementById("dateBadge").textContent = fmtDate();
+
+// Build UI
+const tabBar = document.getElementById("tabBar");
+const mainContent = document.getElementById("mainContent");
+
+const allTab = document.createElement("button");
+allTab.className = "tab active";
+allTab.textContent = "ALL";
+allTab.dataset.section = "all";
+tabBar.appendChild(allTab);
+
+sections.forEach(sec => {
+  const tab = document.createElement("button");
+  tab.className = "tab";
+  tab.textContent = sec.label;
+  tab.dataset.section = sec.id;
+  tabBar.appendChild(tab);
+
+  const secEl = document.createElement("div");
+  secEl.className = "section";
+  secEl.id = `sec-${sec.id}`;
+
+  const hdr = document.createElement("div");
+  hdr.className = "section-header";
+  hdr.style.color = sec.color;
+  hdr.innerHTML = `
+    <div class="section-dot"></div>
+    <div class="section-label">${sec.label}</div>
+    <div class="section-count" id="count-${sec.id}">0 / ${sec.items.length}</div>
+    <div class="section-chevron">▾</div>
+  `;
+  hdr.addEventListener("click", () => secEl.classList.toggle("collapsed"));
+  secEl.appendChild(hdr);
+
+  const body = document.createElement("div");
+  body.className = "section-body";
+
+  // Column header
+  const colHdr = document.createElement("div");
+  colHdr.className = "col-header";
+  colHdr.innerHTML = `<span></span><span>ITEM</span><span>QTY</span><span>PAR</span><span></span>`;
+  body.appendChild(colHdr);
+
+  sec.items.forEach((item, idx) => {
+    // Item row wrapper (supports note row spanning)
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "contents";
+
+    const itemEl = document.createElement("div");
+    itemEl.className = "item" + (item.qty ? " qty-required" : "");
+    itemEl.id = `item-${sec.id}-${idx}`;
+    itemEl.dataset.name = item.name.toLowerCase();
+
+    itemEl.innerHTML = `
+      <div class="item-check">
+        <div class="check-box" id="chk-${sec.id}-${idx}">✓</div>
+      </div>
+      <div class="item-name" id="name-${sec.id}-${idx}">${item.name}</div>
+      <div class="qty-wrap">
+        <div class="qty-inner">
+          <button class="qty-btn" data-action="dec" data-sec="${sec.id}" data-idx="${idx}">−</button>
+          <div class="qty-val" id="qty-${sec.id}-${idx}">0</div>
+          <button class="qty-btn" data-action="inc" data-sec="${sec.id}" data-idx="${idx}">+</button>
+        </div>
+      </div>
+      <div class="par-wrap">
+        <input class="par-input" type="number" min="0" placeholder="—"
+          id="par-${sec.id}-${idx}" data-sec="${sec.id}" data-idx="${idx}"
+          value="${getPar(sec.id, idx)}">
+      </div>
+      <div class="note-cell">
+        <button class="note-btn" id="notebtn-${sec.id}-${idx}" data-sec="${sec.id}" data-idx="${idx}">✎</button>
+      </div>
+      <div class="note-row" id="noterow-${sec.id}-${idx}">
+        <input type="text" placeholder="Add note..." id="noteinput-${sec.id}-${idx}" data-sec="${sec.id}" data-idx="${idx}">
+      </div>
+    `;
+
+    body.appendChild(itemEl);
+  });
+
+  secEl.appendChild(body);
+  mainContent.appendChild(secEl);
+});
+
+// ── EVENTS ──
+
+// Checkbox / name tap → toggle checked, auto-set qty to 1 on check
+mainContent.addEventListener("click", e => {
+  const chk = e.target.closest(".item-check, .item-name");
+  if (!chk) return;
+  const item = chk.closest(".item");
+  if (!item) return;
+  const [, sId, idx] = item.id.split("-");
+  const iIdx = parseInt(idx);
+  const cur = getState(sId, iIdx);
+  const nowChecked = !cur.checked;
+  const newQty = nowChecked && cur.qty === 0 ? 1 : cur.qty;
+  setState(sId, iIdx, { checked: nowChecked, qty: newQty });
+  renderItem(sId, iIdx);
+  updateCounts();
+});
+
+// QTY buttons
+mainContent.addEventListener("click", e => {
+  const btn = e.target.closest(".qty-btn");
+  if (!btn) return;
+  const { action, sec, idx } = btn.dataset;
+  const iIdx = parseInt(idx);
+  const cur = getState(sec, iIdx);
+  let newQty = cur.qty + (action === "inc" ? 1 : -1);
+  if (newQty < 0) newQty = 0;
+  const nowChecked = newQty > 0 ? true : cur.checked;
+  setState(sec, iIdx, { qty: newQty, checked: nowChecked });
+  renderItem(sec, iIdx);
+  updateCounts();
+});
+
+// PAR input
+mainContent.addEventListener("change", e => {
+  const inp = e.target.closest(".par-input");
+  if (!inp) return;
+  const { sec, idx } = inp.dataset;
+  setPar(sec, parseInt(idx), inp.value);
+});
+
+// Note button toggle
+mainContent.addEventListener("click", e => {
+  const btn = e.target.closest(".note-btn");
+  if (!btn) return;
+  const { sec, idx } = btn.dataset;
+  const noteRow = document.getElementById(`noterow-${sec}-${idx}`);
+  noteRow.classList.toggle("open");
+  if (noteRow.classList.contains("open")) {
+    document.getElementById(`noteinput-${sec}-${idx}`).focus();
+  }
+});
+
+// Note input
+mainContent.addEventListener("input", e => {
+  const inp = e.target.closest(".note-row input");
+  if (!inp) return;
+  const { sec, idx } = inp.dataset;
+  setState(sec, parseInt(idx), { note: inp.value });
+  document.getElementById(`notebtn-${sec}-${idx}`).classList.toggle("has-note", inp.value.length > 0);
+});
+
+// ── RENDER ──
+function renderItem(sId, iIdx) {
+  const s = getState(sId, iIdx);
+  const itemEl = document.getElementById(`item-${sId}-${iIdx}`);
+  const qtyEl  = document.getElementById(`qty-${sId}-${iIdx}`);
+  itemEl.classList.toggle("checked", s.checked);
+  qtyEl.textContent = s.qty;
+}
+
+function updateCounts() {
+  let total = 0;
+  sections.forEach(sec => {
+    let checked = 0;
+    sec.items.forEach((_, idx) => { if (getState(sec.id, idx).checked) checked++; });
+    total += checked;
+    document.getElementById(`count-${sec.id}`).textContent = `${checked} / ${sec.items.length}`;
+  });
+  document.getElementById("checkedCount").textContent = total > 0 ? `(${total})` : "";
+}
+
+// ── TABS ──
+tabBar.addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  const target = tab.dataset.section;
+  document.querySelectorAll(".section").forEach(s => {
+    s.style.display = (target === "all" || s.id === `sec-${target}`) ? "" : "none";
+  });
+  if (target !== "all") {
+    document.getElementById(`sec-${target}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
+
+// ── SEARCH ──
+document.getElementById("searchInput").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase().trim();
+  sections.forEach(sec => {
+    let anyVisible = false;
+    sec.items.forEach((item, idx) => {
+      const el = document.getElementById(`item-${sec.id}-${idx}`);
+      const match = !q || item.name.toLowerCase().includes(q);
+      el.classList.toggle("hidden", !match);
+      if (match) anyVisible = true;
+    });
+    document.getElementById(`sec-${sec.id}`).classList.toggle("all-hidden", !anyVisible);
+    if (q && anyVisible) document.getElementById(`sec-${sec.id}`).classList.remove("collapsed");
+  });
+});
+
+// ── CLEAR ──
+document.getElementById("clearBtn").addEventListener("click", () => {
+  if (!confirm("Clear all checked items?")) return;
+  clearAll();
+});
+
+function clearAll() {
+  Object.keys(state).forEach(k => delete state[k]);
+  sections.forEach(sec => {
+    sec.items.forEach((_, idx) => {
+      renderItem(sec.id, idx);
+      const ni = document.getElementById(`noteinput-${sec.id}-${idx}`);
+      if (ni) ni.value = "";
+      document.getElementById(`notebtn-${sec.id}-${idx}`)?.classList.remove("has-note");
+      document.getElementById(`noterow-${sec.id}-${idx}`)?.classList.remove("open");
+    });
+  });
+  updateCounts();
+}
+
+// ── SUMMARY ──
+document.getElementById("summaryBtn").addEventListener("click", openSummary);
+document.getElementById("modalClose").addEventListener("click", () => document.getElementById("modalOverlay").classList.remove("open"));
+document.getElementById("modalOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("modalOverlay")) document.getElementById("modalOverlay").classList.remove("open");
+});
+
+function openSummary() {
+  document.getElementById("modalDate").textContent = `Order Date: ${fmtDate()}`;
+  const container = document.getElementById("summaryContent");
+  container.innerHTML = "";
+  let anyChecked = false;
+
+  sections.forEach(sec => {
+    const checkedItems = sec.items
+      .map((item, idx) => ({ item, idx, s: getState(sec.id, idx) }))
+      .filter(x => x.s.checked);
+    if (!checkedItems.length) return;
+    anyChecked = true;
+
+    const secDiv = document.createElement("div");
+    secDiv.className = "summary-section";
+    const title = document.createElement("div");
+    title.className = "summary-section-title";
+    title.style.color = sec.color;
+    title.textContent = sec.label;
+    secDiv.appendChild(title);
+
+    checkedItems.forEach(({ item, idx, s }) => {
+      const wrap = document.createElement("div");
+      wrap.className = "summary-item-wrap";
+      const par = getPar(sec.id, idx);
+      const qtyLabel = `${s.qty} case${s.qty !== 1 ? "s" : ""}` + (par ? ` (PAR: ${par})` : "");
+      const row = document.createElement("div");
+      row.className = "summary-item";
+      row.innerHTML = `<span class="summary-item-name">${item.name}</span><span class="summary-item-qty">${qtyLabel}</span>`;
+      wrap.appendChild(row);
+      if (s.note) {
+        const note = document.createElement("div");
+        note.className = "summary-item-note";
+        note.textContent = `↳ ${s.note}`;
+        wrap.appendChild(note);
+      }
+      secDiv.appendChild(wrap);
+    });
+    container.appendChild(secDiv);
+  });
+
+  if (!anyChecked) container.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">No items checked yet.</p>`;
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+// ── COPY ──
+document.getElementById("copyBtn").addEventListener("click", () => {
+  let text = `ORDER SHEET — ${fmtDate()}\n${"═".repeat(42)}\n\n`;
+  sections.forEach(sec => {
+    const checkedItems = sec.items
+      .map((item, idx) => ({ item, idx, s: getState(sec.id, idx) }))
+      .filter(x => x.s.checked);
+    if (!checkedItems.length) return;
+    text += `[ ${sec.label} ]\n`;
+    checkedItems.forEach(({ item, idx, s }) => {
+      const par = getPar(sec.id, idx);
+      text += `  • ${item.name} — ${s.qty} case${s.qty !== 1 ? "s" : ""}`;
+      if (par) text += ` (PAR: ${par})`;
+      if (s.note) text += ` | Note: ${s.note}`;
+      text += "\n";
+    });
+    text += "\n";
+  });
+  navigator.clipboard.writeText(text).then(() => {
+    const conf = document.getElementById("copyConfirm");
+    conf.textContent = "✓ Copied to clipboard";
+    setTimeout(() => conf.textContent = "", 2500);
+  });
+});
+
+// ── RESET FROM MODAL ──
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (!confirm("Clear entire order and start fresh?")) return;
+  clearAll();
+  document.getElementById("modalOverlay").classList.remove("open");
+});
+
+updateCounts();
+</script>
+</body>
+</html>
